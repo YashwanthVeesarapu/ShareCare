@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>FastAPI Concurrent Folder Uploader with Accurate Progress</title>
+    <style>
+      #progressContainer {
+        margin-top: 1em;
+        max-width: 400px;
+      }
+      #progressBar {
+        width: 100%;
+        height: 20px;
+      }
+      #failedSection {
+        margin-top: 1em;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Upload a Folder</h2>
+    <input
+      type="file"
+      id="picker"
+      webkitdirectory
+      directory
+      multiple
+      name="files"
+    />
+    <button id="upload" disabled>Upload Folder</button>
+
+    <div id="progressContainer" hidden>
+      <progress id="progressBar" value="0" max="100"></progress>
+      <span id="progressText">0%</span>
+    </div>
+
+    <div id="summary"></div>
+
+    <div id="failedSection" hidden>
+      <h3>Failed Files</h3>
+      <ul id="failedList"></ul>
+      <button id="retryBtn">Retry Failed</button>
+    </div>
+
+    <pre id="status"></pre>
+
+    <script>
+      const picker = document.getElementById("picker"),
+        btn = document.getElementById("upload"),
+        status = document.getElementById("status"),
+        progC = document.getElementById("progressContainer"),
+        progB = document.getElementById("progressBar"),
+        progT = document.getElementById("progressText"),
+        summaryEl = document.getElementById("summary"),
+        failedSection = document.getElementById("failedSection"),
+        failedListEl = document.getElementById("failedList"),
+        retryBtn = document.getElementById("retryBtn");
+
+      let originalFiles = [];
+      let failedFiles = [];
+
+      picker.addEventListener("change", () => {
+        originalFiles = Array.from(picker.files);
+        status.textContent = `Selected ${originalFiles.length} files.`;
+        btn.disabled = originalFiles.length === 0;
+      });
+
+      btn.addEventListener("click", () => startUpload(originalFiles));
+      retryBtn.addEventListener("click", () => startUpload(failedFiles, true));
+
+      function asyncPool(poolLimit, items, iteratorFn) {
+        const executing = [];
+        return items.map((item) =>
+          Promise.resolve()
+            .then(() => iteratorFn(item))
+            .then((res) => {
+              executing.splice(executing.indexOf(p), 1);
+              return res;
+            })
+        );
+      }
+
+      async function startUpload(filesArray, isRetry = false) {
+        const totalFiles = filesArray.length;
+        let uploadedCount = 0;
+        let uploadedBytes = 0;
+        const totalBytes = filesArray.reduce((sum, f) => sum + f.size, 0);
+        const fileProgress = new Array(totalFiles).fill(0);
+        failedFiles = [];
+
+        // reset UI
+        progB.value = 0;
+        progT.textContent = "0%";
+        progC.hidden = false;
+        summaryEl.textContent = `Uploaded 0/${totalFiles} files. Failed: 0`;
+        failedSection.hidden = true;
+        failedListEl.innerHTML = "";
+        status.textContent = "";
+
+        // prepare tasks with file and its index
+        const tasks = filesArray.map((file, idx) => ({ file, idx }));
+
+        // upload with max 4 concurrent
+        const concurrency = 4;
+        const pool = [];
+
+        for (const task of tasks) {
+          const p = uploadOne(
+            task.file,
+            task.idx,
+            fileProgress,
+            totalBytes,
+            () => {
+              uploadedBytes = fileProgress.reduce((sum, v) => sum + v, 0);
+              const pct = Math.round((uploadedBytes / totalBytes) * 100);
+              progB.value = pct;
+              progT.textContent = `${pct}%`;
+            }
+          ).then((success) => {
+            if (success) uploadedCount++;
+            else failedFiles.push(task.file);
+            summaryEl.textContent = `Uploaded ${uploadedCount}/${totalFiles} files. Failed: ${failedFiles.length}`;
+          });
+
+          pool.push(p);
+          if (pool.length >= concurrency) {
+            await Promise.race(pool);
+            pool.splice(
+              pool.findIndex((pr) => pr.isFulfilled),
+              1
+            );
+          }
+        }
+        await Promise.all(pool);
+
+        // finalize
+        progC.hidden = true;
+        status.textContent = failedFiles.length
+          ? "Upload complete with errors."
+          : "All files uploaded successfully!";
+
+        if (failedFiles.length) {
+          failedSection.hidden = false;
+          failedFiles.forEach((f) => {
+            const li = document.createElement("li");
+            li.textContent = f.webkitRelativePath || f.name;
+            failedListEl.appendChild(li);
+          });
+        }
+      }
+
+      function uploadOne(file, idx, fileProgress, totalBytes, onProgress) {
+        return new Promise((resolve) => {
+          const form = new FormData();
+          form.append("files", file, file.webkitRelativePath);
+
+          const xhr = new XMLHttpRequest();
+          xhr.open(
+            "POST",
+            `/files?token=${new URLSearchParams(window.location.search).get(
+              "token"
+            )}`,
+            true
+          );
+
+          xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            const loaded = e.loaded;
+            const prev = fileProgress[idx];
+            fileProgress[idx] = loaded;
+            onProgress();
+          };
+
+          xhr.onload = () => resolve(xhr.status === 200);
+          xhr.onerror = () => resolve(false);
+          xhr.send(form);
+        });
+      }
+    </script>
+  </body>
+</html>
