@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
+from models.file import CheckRequest
+
 app = FastAPI()
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "uploads"
@@ -20,6 +22,16 @@ app.mount("/files/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 @app.get("/files", response_class=HTMLResponse)
 async def form():
     return templates.TemplateResponse("upload.html", {"request": {}})
+
+@app.post("/files/check")
+async def check_existing(req: CheckRequest):
+    skipped = []
+    for rel in req.paths:
+        dest = UPLOAD_DIR / rel
+        if dest.exists():
+            skipped.append(rel)
+    need = [p for p in req.paths if p not in skipped]
+    return {"need_upload": need, "already_exists": skipped}
 
 @app.post("/files")
 async def upload(files: list[UploadFile] = File(...)):
@@ -42,7 +54,6 @@ async def upload(files: list[UploadFile] = File(...)):
         leaf = Path(rel_path).name
         dest = folder / leaf
 
-        time.sleep(1)  # Simulate some processing time
         # Skip if file already exists
         if dest.exists():
             skipped.append(str(dest.relative_to(BASE_DIR)))
@@ -59,3 +70,9 @@ async def upload(files: list[UploadFile] = File(...)):
         "saved": saved,
         "skipped": skipped
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    # Run the server with hot reload
+    uvicorn.run('main:app', host="0.0.0.0", port=8000, reload=True)

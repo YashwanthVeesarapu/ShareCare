@@ -271,7 +271,7 @@
         const files = Array.from(elements.picker.files);
         const folderName =
           files[0]?.webkitRelativePath.split("/")[0] || "Unknown";
-        startUpload(files, folderName);
+        preflightAndStart(files, folderName, false);
       });
 
       elements.retryBtn.addEventListener("click", () => {
@@ -437,6 +437,49 @@
         }
       }
 
+      async function preflightAndStart(
+        filesArray,
+        folderName,
+        isRetry = false
+      ) {
+        // only do the check on the first attempt, not on retries
+        if (!isRetry) {
+          // build list of paths
+          const paths = filesArray.map((f) => f.webkitRelativePath || f.name);
+
+          // ask server which ones you actually need to send
+          const res = await fetch(
+            `/files/check?token=${new URLSearchParams(
+              window.location.search
+            ).get("token")}
+          `,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ paths }),
+            }
+          );
+          const { need_upload, already_exists } = await res.json();
+
+          // update UI: how many we'll skip
+          elements.status.textContent = `Skipping ${already_exists.length} existing files, uploading ${need_upload.length}.`;
+
+          // filter out the ones we don’t need
+          filesArray = filesArray.filter((f) =>
+            need_upload.includes(f.webkitRelativePath || f.name)
+          );
+
+          if (need_upload.length === 0) {
+            elements.status.textContent =
+              "All files already exist. Nothing to upload.";
+            return;
+          }
+        }
+
+        // now hand off to your original startUpload
+        await startUpload(filesArray, folderName, isRetry);
+      }
+
       // Finalize UI
       function finalizeUpload(uploadedCount, totalFiles, folderName) {
         elements.progressContainer.style.display = "none";
@@ -462,6 +505,8 @@
           } completed with ${failedFiles.length} errors.`;
         } else if (uploadedCount > 0) {
           elements.status.textContent = `All ${uploadedCount} files in ${folderName} uploaded successfully!`;
+          // remove files selected
+          elements.picker.value = "";
         }
 
         failedFiles = failedFiles.filter((f) => f); // Remove nullified references

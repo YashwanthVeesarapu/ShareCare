@@ -1,9 +1,11 @@
 share
 
 proxy/venv
-proxy/text
+proxy/test
 
 proxy/uploads
+
+scripts
 
 # python
 __pycache__/
