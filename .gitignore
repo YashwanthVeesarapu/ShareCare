@@ -1,6 +1,7 @@
 share
 
 proxy/venv
+proxy/text
 
 # python
 __pycache__/

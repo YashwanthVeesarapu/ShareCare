@@ -2,85 +2,319 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>FastAPI Concurrent Folder Uploader with Accurate Progress</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concurrent Folder Uploader (10GB+)</title>
     <style>
-      #progressContainer {
-        margin-top: 1em;
-        max-width: 400px;
+      :root {
+        --primary: #42a5f5;
+        --success: #4caf50;
+        --error: #ef5350;
+        --bg: #1e1e1e;
+        --text: #e0e0e0;
+        --accent: #424242;
+        --border: #616161;
       }
+
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        max-width: 600px;
+        margin: 2rem auto;
+        padding: 1rem;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+      }
+
+      h2,
+      h3 {
+        color: var(--primary);
+      }
+
+      .upload-controls {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        align-items: center;
+      }
+
+      input[type="file"],
+      button {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        font-size: 1rem;
+        background: var(--accent);
+        color: var(--text);
+      }
+
+      input[type="file"] {
+        width: 100%;
+      }
+
+      button {
+        background: var(--primary);
+        border: none;
+        cursor: pointer;
+        transition: background 0.3s, transform 0.1s;
+      }
+
+      button:hover:not(:disabled) {
+        background: #2196f3;
+        transform: translateY(-1px);
+      }
+
+      button:disabled {
+        background: #616161;
+        cursor: not-allowed;
+      }
+
+      button.cancel {
+        background: var(--error);
+      }
+
+      button.cancel:hover:not(:disabled) {
+        background: #e53935;
+      }
+
+      #progressContainer {
+        margin: 1.5rem 0;
+        display: none;
+      }
+
       #progressBar {
         width: 100%;
-        height: 20px;
+        height: 1.5rem;
+        border-radius: 4px;
+        background: var(--accent);
+        transition: value 0.3s ease;
       }
-      #failedSection {
-        margin-top: 1em;
+
+      #progressBar::-webkit-progress-bar {
+        background: var(--accent);
+        border-radius: 4px;
+      }
+
+      #progressBar::-webkit-progress-value {
+        background: var(--primary);
+        border-radius: 4px;
+      }
+
+      #progressBar::-moz-progress-bar {
+        background: var(--primary);
+        border-radius: 4px;
+      }
+
+      .progress-info {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+      }
+
+      #failedSection,
+      #historySection {
+        margin-top: 1.5rem;
+        display: none;
+      }
+
+      #failedList,
+      #historyList {
+        list-style: none;
+        padding: 0;
+        max-height: 200px;
+        overflow-y: auto;
+      }
+
+      #failedList li {
+        padding: 0.5rem;
+        background: #4a2c2c;
+        margin-bottom: 0.5rem;
+        border-radius: 4px;
+      }
+
+      #historyList li {
+        padding: 0.5rem;
+        background: #2c3e50;
+        margin-bottom: 0.5rem;
+        border-radius: 4px;
+      }
+
+      #status {
+        white-space: pre-wrap;
+        background: var(--accent);
+        padding: 1rem;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        min-height: 2rem;
+      }
+
+      @media (max-width: 500px) {
+        body {
+          padding: 0.5rem;
+        }
+        .upload-controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
       }
     </style>
   </head>
   <body>
-    <h2>Upload a Folder</h2>
-    <input
-      type="file"
-      id="picker"
-      webkitdirectory
-      directory
-      multiple
-      name="files"
-    />
-    <button id="upload" disabled>Upload Folder</button>
+    <header>
+      <h2>Upload a Folder</h2>
+    </header>
+    <main>
+      <section class="upload-controls">
+        <input
+          type="file"
+          id="picker"
+          webkitdirectory
+          directory
+          multiple
+          name="files"
+          aria-label="Select folder to upload"
+        />
+        <button id="upload" disabled>Upload Folder</button>
+        <button id="cancel" class="cancel" disabled>Cancel</button>
+      </section>
 
-    <div id="progressContainer" hidden>
-      <progress id="progressBar" value="0" max="100"></progress>
-      <span id="progressText">0%</span>
-    </div>
+      <section id="progressContainer" aria-live="polite">
+        <progress
+          id="progressBar"
+          value="0"
+          max="100"
+          aria-label="Upload progress"
+        ></progress>
+        <div class="progress-info">
+          <span id="progressText">0%</span>
+          <span id="estimatedTime"></span>
+        </div>
+      </section>
 
-    <div id="summary"></div>
+      <section id="summary" aria-live="polite"></section>
 
-    <div id="failedSection" hidden>
-      <h3>Failed Files</h3>
-      <ul id="failedList"></ul>
-      <button id="retryBtn">Retry Failed</button>
-    </div>
+      <section id="failedSection" aria-live="polite">
+        <h3>Failed Files</h3>
+        <ul id="failedList"></ul>
+        <button id="retryBtn">Retry Failed</button>
+      </section>
 
-    <pre id="status"></pre>
+      <section id="historySection" aria-live="polite">
+        <h3>Upload History</h3>
+        <ul id="historyList"></ul>
+      </section>
+
+      <pre id="status" aria-live="polite"></pre>
+    </main>
 
     <script>
-      const picker = document.getElementById("picker"),
-        btn = document.getElementById("upload"),
-        status = document.getElementById("status"),
-        progC = document.getElementById("progressContainer"),
-        progB = document.getElementById("progressBar"),
-        progT = document.getElementById("progressText"),
-        summaryEl = document.getElementById("summary"),
-        failedSection = document.getElementById("failedSection"),
-        failedListEl = document.getElementById("failedList"),
-        retryBtn = document.getElementById("retryBtn");
+      const elements = {
+        picker: document.getElementById("picker"),
+        uploadBtn: document.getElementById("upload"),
+        cancelBtn: document.getElementById("cancel"),
+        status: document.getElementById("status"),
+        progressContainer: document.getElementById("progressContainer"),
+        progressBar: document.getElementById("progressBar"),
+        progressText: document.getElementById("progressText"),
+        estimatedTime: document.getElementById("estimatedTime"),
+        summary: document.getElementById("summary"),
+        failedSection: document.getElementById("failedSection"),
+        failedList: document.getElementById("failedList"),
+        retryBtn: document.getElementById("retryBtn"),
+        historySection: document.getElementById("historySection"),
+        historyList: document.getElementById("historyList"),
+      };
 
-      let originalFiles = [];
       let failedFiles = [];
+      let abortController = null;
+      let startTime = null;
 
-      picker.addEventListener("change", () => {
-        originalFiles = Array.from(picker.files);
-        status.textContent = `Selected ${originalFiles.length} files.`;
-        btn.disabled = originalFiles.length === 0;
-      });
-
-      btn.addEventListener("click", () => startUpload(originalFiles));
-      retryBtn.addEventListener("click", () => startUpload(failedFiles, true));
-
-      function asyncPool(poolLimit, items, iteratorFn) {
-        const executing = [];
-        return items.map((item) =>
-          Promise.resolve()
-            .then(() => iteratorFn(item))
-            .then((res) => {
-              executing.splice(executing.indexOf(p), 1);
-              return res;
-            })
+      // Load and display upload history from localStorage
+      function loadUploadHistory() {
+        const history = JSON.parse(
+          localStorage.getItem("uploadHistory") || "[]"
         );
+        elements.historySection.style.display = history.length
+          ? "block"
+          : "none";
+        elements.historyList.innerHTML = "";
+        history.forEach((entry) => {
+          const li = document.createElement("li");
+          li.textContent = `${entry.folderName} - ${
+            entry.fileCount
+          } files - ${new Date(entry.timestamp).toLocaleString()}`;
+          elements.historyList.appendChild(li);
+        });
       }
 
-      async function startUpload(filesArray, isRetry = false) {
+      // Save upload metadata to localStorage
+      function saveUploadHistory(folderName, fileCount) {
+        const history = JSON.parse(
+          localStorage.getItem("uploadHistory") || "[]"
+        );
+        history.push({
+          folderName,
+          fileCount,
+          timestamp: new Date().toISOString(),
+        });
+        localStorage.setItem("uploadHistory", JSON.stringify(history));
+        loadUploadHistory();
+      }
+
+      // Event Listeners
+      elements.picker.addEventListener("change", () => {
+        elements.status.textContent = `Selected ${elements.picker.files.length} files.`;
+        elements.uploadBtn.disabled = elements.picker.files.length === 0;
+      });
+
+      elements.uploadBtn.addEventListener("click", () => {
+        const files = Array.from(elements.picker.files);
+        const folderName =
+          files[0]?.webkitRelativePath.split("/")[0] || "Unknown";
+        startUpload(files, folderName);
+      });
+
+      elements.retryBtn.addEventListener("click", () => {
+        const folderName =
+          failedFiles[0]?.webkitRelativePath.split("/")[0] || "Retry";
+        startUpload(failedFiles, folderName, true);
+      });
+
+      elements.cancelBtn.addEventListener("click", cancelUpload);
+
+      // Concurrent Promise Pool
+      async function asyncPool(limit, items, iteratorFn) {
+        const results = [];
+        const executing = new Set();
+
+        for (const item of items) {
+          const promise = Promise.resolve().then(() => iteratorFn(item));
+          results.push(promise);
+          executing.add(promise);
+
+          promise.finally(() => executing.delete(promise));
+
+          if (executing.size >= limit) {
+            await Promise.race(executing);
+          }
+        }
+
+        return Promise.all(results);
+      }
+
+      // Upload Logic
+      async function startUpload(filesArray, folderName, isRetry = false) {
+        if (!filesArray.length) {
+          elements.status.textContent = "No files to upload.";
+          return;
+        }
+
+        abortController = new AbortController();
+        startTime = Date.now();
+        elements.cancelBtn.disabled = false;
+        elements.uploadBtn.disabled = true;
+        elements.picker.disabled = true;
+
         const totalFiles = filesArray.length;
         let uploadedCount = 0;
         let uploadedBytes = 0;
@@ -88,71 +322,76 @@
         const fileProgress = new Array(totalFiles).fill(0);
         failedFiles = [];
 
-        // reset UI
-        progB.value = 0;
-        progT.textContent = "0%";
-        progC.hidden = false;
-        summaryEl.textContent = `Uploaded 0/${totalFiles} files. Failed: 0`;
-        failedSection.hidden = true;
-        failedListEl.innerHTML = "";
-        status.textContent = "";
+        // Reset UI
+        elements.progressBar.value = 0;
+        elements.progressText.textContent = "0%";
+        elements.estimatedTime.textContent = "";
+        elements.progressContainer.style.display = "block";
+        elements.summary.textContent = `Uploaded 0/${totalFiles} files. Failed: 0`;
+        elements.failedSection.style.display = "none";
+        elements.failedList.innerHTML = "";
+        elements.status.textContent = `Starting upload of ${folderName}...`;
 
-        // prepare tasks with file and its index
+        // Prepare tasks
         const tasks = filesArray.map((file, idx) => ({ file, idx }));
 
-        // upload with max 4 concurrent
-        const concurrency = 4;
-        const pool = [];
+        // Clear file references to free memory
+        filesArray.length = 0;
+        elements.picker.value = ""; // Clear file input
 
-        for (const task of tasks) {
-          const p = uploadOne(
-            task.file,
-            task.idx,
-            fileProgress,
-            totalBytes,
-            () => {
-              uploadedBytes = fileProgress.reduce((sum, v) => sum + v, 0);
-              const pct = Math.round((uploadedBytes / totalBytes) * 100);
-              progB.value = pct;
-              progT.textContent = `${pct}%`;
-            }
-          ).then((success) => {
+        // Upload with concurrency limit
+        const concurrency = 4;
+        await asyncPool(concurrency, tasks, async (task) => {
+          if (abortController.signal.aborted) {
+            return { success: false, file: task.file };
+          }
+
+          try {
+            const success = await uploadOne(
+              task.file,
+              task.idx,
+              fileProgress,
+              totalBytes,
+              (bytesUploaded) => {
+                uploadedBytes = bytesUploaded;
+                const pct = Math.round((uploadedBytes / totalBytes) * 100);
+                elements.progressBar.value = pct;
+                elements.progressText.textContent = `${pct}%`;
+                updateEstimatedTime(uploadedBytes, totalBytes);
+              },
+              abortController.signal
+            );
             if (success) uploadedCount++;
             else failedFiles.push(task.file);
-            summaryEl.textContent = `Uploaded ${uploadedCount}/${totalFiles} files. Failed: ${failedFiles.length}`;
-          });
-
-          pool.push(p);
-          if (pool.length >= concurrency) {
-            await Promise.race(pool);
-            pool.splice(
-              pool.findIndex((pr) => pr.isFulfilled),
-              1
-            );
+            return { success, file: task.file };
+          } catch (error) {
+            if (error.name === "AbortError") {
+              return { success: false, file: task.file };
+            }
+            failedFiles.push(task.file);
+            return { success: false, file: task.file, error };
+          } finally {
+            elements.summary.textContent = `Uploaded ${uploadedCount}/${totalFiles} files. Failed: ${failedFiles.length}`;
+            task.file = null; // Clear file reference
           }
-        }
-        await Promise.all(pool);
+        });
 
-        // finalize
-        progC.hidden = true;
-        status.textContent = failedFiles.length
-          ? "Upload complete with errors."
-          : "All files uploaded successfully!";
-
-        if (failedFiles.length) {
-          failedSection.hidden = false;
-          failedFiles.forEach((f) => {
-            const li = document.createElement("li");
-            li.textContent = f.webkitRelativePath || f.name;
-            failedListEl.appendChild(li);
-          });
-        }
+        // Finalize
+        finalizeUpload(uploadedCount, totalFiles, folderName);
       }
 
-      function uploadOne(file, idx, fileProgress, totalBytes, onProgress) {
-        return new Promise((resolve) => {
+      // Single File Upload
+      function uploadOne(
+        file,
+        idx,
+        fileProgress,
+        totalBytes,
+        onProgress,
+        signal
+      ) {
+        return new Promise((resolve, reject) => {
           const form = new FormData();
-          form.append("files", file, file.webkitRelativePath);
+          form.append("files", file, file.webkitRelativePath || file.name);
 
           const xhr = new XMLHttpRequest();
           xhr.open(
@@ -165,17 +404,90 @@
 
           xhr.upload.onprogress = (e) => {
             if (!e.lengthComputable) return;
-            const loaded = e.loaded;
-            const prev = fileProgress[idx];
-            fileProgress[idx] = loaded;
-            onProgress();
+            fileProgress[idx] = e.loaded;
+            const totalUploaded = fileProgress.reduce((sum, v) => sum + v, 0);
+            onProgress(totalUploaded);
           };
 
-          xhr.onload = () => resolve(xhr.status === 200);
-          xhr.onerror = () => resolve(false);
+          xhr.onload = () => {
+            file = null; // Clear file reference
+            resolve(xhr.status === 200);
+          };
+          xhr.onerror = () => {
+            file = null;
+            resolve(false);
+          };
+          xhr.onabort = () => {
+            file = null;
+            reject(new DOMException("Upload aborted", "AbortError"));
+          };
+
+          signal.addEventListener("abort", () => xhr.abort(), { once: true });
+
           xhr.send(form);
         });
       }
+
+      // Cancel Upload
+      function cancelUpload() {
+        if (abortController) {
+          abortController.abort();
+          elements.status.textContent = "Upload cancelled.";
+          finalizeUpload(0, 0, null);
+        }
+      }
+
+      // Finalize UI
+      function finalizeUpload(uploadedCount, totalFiles, folderName) {
+        elements.progressContainer.style.display = "none";
+        elements.cancelBtn.disabled = true;
+        elements.uploadBtn.disabled = false;
+        elements.picker.disabled = false;
+        abortController = null;
+        startTime = null;
+
+        if (folderName && uploadedCount > 0) {
+          saveUploadHistory(folderName, uploadedCount);
+        }
+
+        if (failedFiles.length) {
+          elements.failedSection.style.display = "block";
+          failedFiles.forEach((f) => {
+            const li = document.createElement("li");
+            li.textContent = f.webkitRelativePath || f.name;
+            elements.failedList.appendChild(li);
+          });
+          elements.status.textContent = `Upload of ${
+            folderName || "folder"
+          } completed with ${failedFiles.length} errors.`;
+        } else if (uploadedCount > 0) {
+          elements.status.textContent = `All ${uploadedCount} files in ${folderName} uploaded successfully!`;
+        }
+
+        failedFiles = failedFiles.filter((f) => f); // Remove nullified references
+      }
+
+      // Estimated Time Remaining
+      function updateEstimatedTime(uploadedBytes, totalBytes) {
+        if (!startTime || uploadedBytes === 0) return;
+
+        const elapsed = (Date.now() - startTime) / 1000; // seconds
+        const rate = uploadedBytes / elapsed; // bytes per second
+        const remainingBytes = totalBytes - uploadedBytes;
+        const remainingTime = remainingBytes / rate; // seconds
+
+        if (!isFinite(remainingTime) || remainingTime <= 0) {
+          elements.estimatedTime.textContent = "";
+          return;
+        }
+
+        const minutes = Math.floor(remainingTime / 60);
+        const seconds = Math.round(remainingTime % 60);
+        elements.estimatedTime.textContent = `Est. time: ${minutes}m ${seconds}s`;
+      }
+
+      // Initialize
+      loadUploadHistory();
     </script>
   </body>
 </html>
