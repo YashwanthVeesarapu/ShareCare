@@ -17,7 +17,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 # Serve uploaded files if needed
-app.mount("/files/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# app.mount("/files/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 @app.get("/files", response_class=HTMLResponse)
 async def form():
@@ -75,4 +75,4 @@ async def upload(files: list[UploadFile] = File(...)):
 if __name__ == "__main__":
     import uvicorn
     # Run the server with hot reload
-    uvicorn.run('main:app', host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run('main:app', host="0.0.0.0", port=4000, reload=False, workers=2)
