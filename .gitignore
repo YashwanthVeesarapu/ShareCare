@@ -3,6 +3,8 @@ share
 proxy/venv
 proxy/text
 
+proxy/uploads
+
 # python
 __pycache__/
 *.py[cod]
