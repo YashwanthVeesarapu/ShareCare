@@ -4,12 +4,13 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build
+RUN npm run build:prod
 
 # Production image: serve with Node.js
 FROM node:20-alpine
 WORKDIR /app
-COPY --from=build /app /app
+COPY --from=build /app/dist ./dist
+RUN npm install -g serve
 ENV PORT=8000
-EXPOSE ${PORT}
-CMD sh -c "npx ng serve --port $PORT --host 0.0.0.0"
+EXPOSE 8000
+CMD sh -c "serve -s dist/share/browser -l $PORT"
