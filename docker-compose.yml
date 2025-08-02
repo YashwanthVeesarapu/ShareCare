@@ -3,7 +3,6 @@ services:
     build:
       context: ./share
       dockerfile: Dockerfile
-    image: sharing/ui:latest
     container_name: sharing-ui
     ports:
       - "8000:8000"
@@ -12,12 +11,13 @@ services:
     restart: unless-stopped
     environment:
       - PORT=8000
+    networks:
+      - default
 
   proxy:
     build:
       context: ./proxy
       dockerfile: Dockerfile
-    image: sharing/proxy:latest
     container_name: sharing-proxy
     ports:
       - "8001:8001"
@@ -26,3 +26,10 @@ services:
     restart: unless-stopped
     environment:
       - PORT=8001
+    networks:
+      - default
+
+networks:
+  default:
+    name: shared-network
+    external: true
