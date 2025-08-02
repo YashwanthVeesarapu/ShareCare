@@ -1,28 +1,59 @@
-<form>
-  <label for="fileInput">Select Files </label>
-  <input
-    type="file"
-    (change)="onFolderSelected($event)"
-    id="fileInput"
-    webkitdirectory
-    directory
-    multiple
-  />
-</form>
-<div *ngIf="files.length > 0">
-  <h2>Folder: {{ folderName }}</h2>
-  <h3>Selected Files:</h3>
-  <ul>
-    <li *ngFor="let file of files">{{ file.name }}</li>
-  </ul>
-  <button (click)="uploadFiles()">Upload</button>
-</div>
-<div *ngIf="uploadProgress">
-  <h3>Upload Progress: {{ uploadProgress }}%</h3>
-</div>
-<div *ngIf="uploadError">
-  <h3>Error: {{ uploadError }}</h3>
-</div>
-<div *ngIf="uploadSuccess">
-  <h3>Upload Successful!</h3>
+<div class="upload-wrapper">
+  <div class="upload-box">
+    <!-- Title -->
+    <h2>Upload Your Files or Folders</h2>
+    <p class="tagline">Select a folder and upload files effortlessly</p>
+
+    <!-- Upload Area -->
+    <label for="fileInput" class="upload-area">
+      <div class="upload-icon">📁</div>
+      <span class="upload-text">Click here or drag a folder to upload</span>
+      <input
+        type="file"
+        id="fileInput"
+        (change)="onFolderSelected($event)"
+        webkitdirectory
+        directory
+        multiple
+        hidden
+      />
+    </label>
+
+    <!-- Files Preview -->
+    <div *ngIf="files.length > 0" class="files-section">
+      <h3>📂 Folder: {{ folderName }}</h3>
+      <div class="files-list">
+        <div *ngFor="let file of files" class="file-pill">
+          📄 {{ file.name }}
+        </div>
+      </div>
+      <button
+        class="cute-btn"
+        (click)="uploadFiles()"
+        [disabled]="uploadProgress > 0 && uploadProgress < 100"
+      >
+        ⬆ Upload Files
+      </button>
+    </div>
+
+    <!-- Progress -->
+    <div *ngIf="uploadProgress > 0" class="progress-container">
+      <div class="progress-bar">
+        <div class="progress-fill" [style.width.%]="uploadProgress"></div>
+      </div>
+      <p class="progress-text">{{ uploadProgress }}% uploaded 🎉</p>
+    </div>
+
+    <!-- Status Messages -->
+    <p *ngIf="uploadSuccess" class="status success">✅ Yay! Upload Successful!</p>
+    <p *ngIf="uploadError" class="status error">❌ {{ uploadError }}</p>
+
+    <!-- Failed Files -->
+    <div *ngIf="failedFiles.length > 0" class="failed-files">
+      <h4>⚠️ Failed Files:</h4>
+      <ul>
+        <li *ngFor="let file of failedFiles">📄 {{ file }}</li>
+      </ul>
+    </div>
+  </div>
 </div>
