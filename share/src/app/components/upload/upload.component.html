@@ -1,0 +1,28 @@
+<form>
+  <label for="fileInput">Select Files </label>
+  <input
+    type="file"
+    (change)="onFolderSelected($event)"
+    id="fileInput"
+    webkitdirectory
+    directory
+    multiple
+  />
+</form>
+<div *ngIf="files.length > 0">
+  <h2>Folder: {{ folderName }}</h2>
+  <h3>Selected Files:</h3>
+  <ul>
+    <li *ngFor="let file of files">{{ file.name }}</li>
+  </ul>
+  <button (click)="uploadFiles()">Upload</button>
+</div>
+<div *ngIf="uploadProgress">
+  <h3>Upload Progress: {{ uploadProgress }}%</h3>
+</div>
+<div *ngIf="uploadError">
+  <h3>Error: {{ uploadError }}</h3>
+</div>
+<div *ngIf="uploadSuccess">
+  <h3>Upload Successful!</h3>
+</div>

@@ -1,4 +1,8 @@
-share
+share/node_modules
+share/dist
+share/.angular
+share/.vscode
+
 
 proxy/venv
 proxy/test
@@ -30,3 +34,9 @@ __pycache__/
 Pipfile
 Pipfile.lock
 
+
+# mac files 
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon

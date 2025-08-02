@@ -5,6 +5,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 
 from models.file import CheckRequest
 
@@ -15,6 +16,15 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 # Jinja2 templates for rendering the upload form
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for simplicity, adjust as needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Serve uploaded files if needed
 # app.mount("/files/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -55,9 +65,9 @@ async def upload(files: list[UploadFile] = File(...)):
         dest = folder / leaf
 
         # Skip if file already exists
-        if dest.exists():
-            skipped.append(str(dest.relative_to(BASE_DIR)))
-            continue
+        # if dest.exists():
+        #     skipped.append(str(dest.relative_to(BASE_DIR)))
+        #     continue
 
         # Save new file
         with open(dest, "wb") as f:
@@ -74,5 +84,5 @@ async def upload(files: list[UploadFile] = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    # Run the server with hot reload
-    uvicorn.run('main:app', host="0.0.0.0", port=4000, reload=False, workers=2)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run('main:app', host="0.0.0.0", port=port, reload=False, workers=2)

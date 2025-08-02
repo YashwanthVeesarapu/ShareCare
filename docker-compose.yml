@@ -1,0 +1,28 @@
+services:
+  ui:
+    build:
+      context: ./share
+      dockerfile: Dockerfile
+    image: sharing/ui:latest
+    container_name: sharing-ui
+    ports:
+      - "8000:8000"
+    depends_on:
+      - proxy
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+
+  proxy:
+    build:
+      context: ./proxy
+      dockerfile: Dockerfile
+    image: sharing/proxy:latest
+    container_name: sharing-proxy
+    ports:
+      - "8001:8001"
+    volumes:
+      - ../data/proxy/uploads:/app/uploads
+    restart: unless-stopped
+    environment:
+      - PORT=8001
