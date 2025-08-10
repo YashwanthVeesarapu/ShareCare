@@ -36,6 +36,23 @@
       </button>
     </div>
 
+    <!-- Show counts after check -->
+    <div
+      *ngIf="needUploadPaths.length || alreadyExistsPaths.length"
+      class="files-section"
+    >
+      <div class="counts">
+        <span
+          >Need upload: <strong>{{ needUploadPaths.length }}</strong></span
+        >
+        &nbsp;|&nbsp;
+        <span
+          >Already exists:
+          <strong>{{ alreadyExistsPaths.length }}</strong></span
+        >
+      </div>
+    </div>
+
     <!-- Progress -->
     <div *ngIf="uploadProgress > 0" class="progress-container">
       <div class="progress-bar">
@@ -45,7 +62,9 @@
     </div>
 
     <!-- Status Messages -->
-    <p *ngIf="uploadSuccess" class="status success">✅ Yay! Upload Successful!</p>
+    <p *ngIf="uploadSuccess" class="status success">
+      ✅ Yay! Upload Successful!
+    </p>
     <p *ngIf="uploadError" class="status error">❌ {{ uploadError }}</p>
 
     <!-- Failed Files -->
@@ -54,6 +73,16 @@
       <ul>
         <li *ngFor="let file of failedFiles">📄 {{ file }}</li>
       </ul>
+      <!-- Retry button, only when there are failures -->
+      <div *ngIf="failedFiles.length" class="btn-row" style="margin-top: 10px">
+        <button
+          class="cute-btn danger"
+          (click)="retryFailedFiles()"
+          [disabled]="uploading"
+        >
+          🔁 Retry failed ({{ failedFiles.length }})
+        </button>
+      </div>
     </div>
   </div>
 </div>
