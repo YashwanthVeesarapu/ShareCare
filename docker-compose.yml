@@ -1,31 +1,23 @@
 services:
-  ui:
+#   ui:
+#     build:
+#       context: ./share
+#       dockerfile: Dockerfile
+#     image: share/ui:latest
+
+
+  sharecare:
     build:
-      context: ./share
+      context: .
       dockerfile: Dockerfile
-    container_name: sharing-ui
+    container_name: sharecare
     ports:
       - "8000:8000"
-    depends_on:
-      - proxy
-    restart: unless-stopped
-    environment:
-      - PORT=8000
-    networks:
-      - default
-
-  proxy:
-    build:
-      context: ./proxy
-      dockerfile: Dockerfile
-    container_name: sharing-proxy
-    ports:
-      - "8001:8001"
     volumes:
       - ../data/proxy/uploads:/app/uploads
     restart: unless-stopped
     environment:
-      - PORT=8001
+      - PORT=8000
     networks:
       - default
 

@@ -26,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Serve uploaded files if needed
 # app.mount("/files/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -82,7 +83,11 @@ async def upload(files: list[UploadFile] = File(...)):
     }
 
 
+# Mount the Angular build as static (serve index.html on 404s via html=True)
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
+
+
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8001))
+    port = int(os.environ.get("PORT", 8000))
     uvicorn.run('main:app', host="0.0.0.0", port=port, reload=False, workers=2)

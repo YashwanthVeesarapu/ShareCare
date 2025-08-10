@@ -1,26 +1,28 @@
-# Let Compose pass us the built angular image name
-ARG UI_IMAGE=share/ui:latest
-FROM ${UI_IMAGE} AS ui_artifacts
+# Build the Angular app
+FROM node:20-alpine AS ui
+WORKDIR /app
+COPY share/package.json share/package-lock.json ./
+RUN npm ci
+COPY share/ .
+RUN npm run build:prod
 
 
 # Use official Python image as base
 FROM python:3.12-slim
 
-
-
 # Set working directory
 WORKDIR /app
 
 # Install dependencies
-COPY requirements.txt ./
+COPY proxy/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY proxy/ .
 
-# Copy Angular build artifacts from the angular image
-# If your dist is actually at /app/dist/<project-name>, update the path accordingly.
-COPY --from=ui_artifacts /dist /app/static
+# Copy Angular dist into /app/static
+# If Angular outputs /ui/dist/<project>, update the path accordingly
+COPY --from=ui /app/dist/share/browser /app/static
 
 ENV PORT=8000
 # Expose port (change if your app uses a different port)
